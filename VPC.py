@@ -39,6 +39,10 @@ from sklearn.metrics import (
     ConfusionMatrixDisplay,
 )
 import matplotlib.pyplot as plt
+from sklearn.svm import LinearSVC
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.svm import SVC
 
 # %% [markdown]
 # # Define the path of useful files
@@ -165,8 +169,40 @@ def compute_metrics(Y_test, Y_pred):
     return acc, f1_macro, prec_private, rec_private, conf_matrix
 
 
+# %%
+def print_metrics(acc, f1_macro, prec_private, rec_private, conf_matrix):
+    # Print result metrics
+    print(f"Accuracy : {acc:.4f}")
+    print(f"Macro-F1 : {f1_macro:.4f}")
+    print(f"Precision (Private class) : {prec_private:.4f}")
+    print(f"Recall (Private Class) : {rec_private:.4f}")
+    # Print confusion matrix
+    disp = ConfusionMatrixDisplay(
+        confusion_matrix=conf_matrix, display_labels=["Public", "Private"]
+    )
+    disp.plot(cmap=plt.cm.Blues)
+    plt.title("Confusion Matrix")
+    plt.show()
+
+
 # %% [markdown]
-# # Logistic Regression with user_deep_tags
+# # Topic 3 — Comparison of classical models
+#
+# Question:
+#
+# Which classical machine learning model works best?
+#
+# Compare several models, for example:
+#
+# - Logistic Regression
+# - Linear SVM
+# - RBF SVM
+# - Random Forest
+# - XGBoost
+# - k-NN
+
+# %% [markdown]
+# ## Load training and testing data (user and deep tags)
 
 # %%
 vectorizer = TfidfVectorizer(max_features=5000)
@@ -175,32 +211,143 @@ X_train, Y_train = get_features_target_from_tags_file(
     TRAIN_USER_DEEP_TAGS_PATH, vectorizer, False
 )
 
-# Train Logistic Regression model
-model = LogisticRegression(max_iter=1000)
-model.fit(X_train, Y_train)
-
-# %%
 # Get features (X) and target (Y) for testing data (user and deep tags)
 X_test, Y_test = get_features_target_from_tags_file(
     TEST_USER_DEEP_TAGS_PATH, vectorizer, True
 )
 
-# Prediction
-Y_pred = model.predict(X_test)
+# List that contains all the metrics for all the models
+metrics = []
 
+# %% [markdown]
+# ## Train Logistic Regression model
+
+# %%
+# Train Logistic Regression model
+model_logistic_regression = LogisticRegression(max_iter=1000)
+model_logistic_regression.fit(X_train, Y_train)
+
+# %% [markdown]
+# ## Train Linear SVM model
+
+# %%
+model_linear_svm = LinearSVC(random_state=0, tol=1e-5)
+model_linear_svm.fit(X_train, Y_train)
+
+# %% [markdown]
+# ## Train Random Forest model
+
+# %%
+model_random_forest = RandomForestClassifier(random_state=0)
+model_random_forest.fit(X_train, Y_train)
+
+# %% [markdown]
+# ## Train k-NN model
+
+# %%
+model_knn = KNeighborsClassifier()
+model_knn.fit(X_train, Y_train)
+
+# %% [markdown]
+# ## Train RBF SVM model
+
+# %%
+model_rbf_svm = SVC(kernel="rbf")
+model_rbf_svm.fit(X_train, Y_train)
+
+# %% [markdown]
+# ## Results for Logistic Regression model
+
+# %%
+# Prediction
+Y_pred = model_logistic_regression.predict(X_test)
 
 acc, f1_macro, prec_private, rec_private, conf_matrix = compute_metrics(Y_test, Y_pred)
 
-# Print result metrics
-print(f"Accuracy : {acc:.4f}")
-print(f"Macro-F1 : {f1_macro:.4f}")
-print(f"Precision (Private class) : {prec_private:.4f}")
-print(f"Recall (Private Class) : {rec_private:.4f}")
-
-# Print confusion matrix
-disp = ConfusionMatrixDisplay(
-    confusion_matrix=conf_matrix, display_labels=["Public", "Private"]
+metrics.append(
+    ["Logistic Regression", acc, f1_macro, prec_private, rec_private, conf_matrix]
 )
-disp.plot(cmap=plt.cm.Blues)
-plt.title("Confusion Matrix")
+
+print_metrics(acc, f1_macro, prec_private, rec_private, conf_matrix)
+
+# %% [markdown]
+# ## Results for Linear SVM model
+
+# %%
+# Prediction
+Y_pred = model_linear_svm.predict(X_test)
+
+acc, f1_macro, prec_private, rec_private, conf_matrix = compute_metrics(Y_test, Y_pred)
+
+metrics.append(["Linear SVM", acc, f1_macro, prec_private, rec_private, conf_matrix])
+
+print_metrics(acc, f1_macro, prec_private, rec_private, conf_matrix)
+
+# %% [markdown]
+# ## Results for Random Forest model
+
+# %%
+# Prediction
+Y_pred = model_random_forest.predict(X_test)
+
+acc, f1_macro, prec_private, rec_private, conf_matrix = compute_metrics(Y_test, Y_pred)
+
+metrics.append(["Random Forest", acc, f1_macro, prec_private, rec_private, conf_matrix])
+
+print_metrics(acc, f1_macro, prec_private, rec_private, conf_matrix)
+
+# %% [markdown]
+# ## Results for k-NN model
+
+# %%
+# Prediction
+Y_pred = model_knn.predict(X_test)
+
+acc, f1_macro, prec_private, rec_private, conf_matrix = compute_metrics(Y_test, Y_pred)
+
+metrics.append(["k-NN", acc, f1_macro, prec_private, rec_private, conf_matrix])
+
+print_metrics(acc, f1_macro, prec_private, rec_private, conf_matrix)
+
+# %% [markdown]
+# ## Results for RBF SVM
+
+# %%
+# Prediction
+Y_pred = model_rbf_svm.predict(X_test)
+
+acc, f1_macro, prec_private, rec_private, conf_matrix = compute_metrics(Y_test, Y_pred)
+
+metrics.append(["RBF SVM", acc, f1_macro, prec_private, rec_private, conf_matrix])
+
+print_metrics(acc, f1_macro, prec_private, rec_private, conf_matrix)
+
+# %% [markdown]
+# ## Summary
+
+# %%
+metrics_df = pd.DataFrame(
+    metrics,
+    columns=[
+        "Model",
+        "Accuracy",
+        "Macro-F1",
+        "Precision (Private class)",
+        "Recall (Private Class)",
+        "Confusion matrix",
+    ],
+)
+fig, axs = plt.subplots(metrics_df.shape[0], figsize=(30, 30))
+
+
+for index, row in metrics_df.iterrows():
+    disp = ConfusionMatrixDisplay(
+        confusion_matrix=row["Confusion matrix"], display_labels=["Public", "Private"]
+    )
+    disp.plot(ax=axs[index], cmap=plt.cm.Blues)
+    axs[index].set_title("Confusion Matrix for " + row["Model"])
+
+
 plt.show()
+
+metrics_df
