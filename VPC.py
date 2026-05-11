@@ -43,6 +43,8 @@ from sklearn.svm import LinearSVC
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import SVC
+from sklearn.model_selection import GridSearchCV
+import xgboost as xgb
 
 # %% [markdown]
 # # Define the path of useful files
@@ -202,67 +204,173 @@ def print_metrics(acc, f1_macro, prec_private, rec_private, conf_matrix):
 # - k-NN
 
 # %% [markdown]
-# ## Load training and testing data (user and deep tags)
+# ## Load training, tests and validation datasets (user and deep tags)
 
 # %%
 vectorizer = TfidfVectorizer(max_features=5000)
-# Get features (X) and target (Y) for training data (user and deep tags)
+# Get features (X) and target (Y) for training dataset (user and deep tags)
 X_train, Y_train = get_features_target_from_tags_file(
     TRAIN_USER_DEEP_TAGS_PATH, vectorizer, False
 )
 
-# Get features (X) and target (Y) for testing data (user and deep tags)
+# Get features (X) and target (Y) for test dataset (user and deep tags)
 X_test, Y_test = get_features_target_from_tags_file(
     TEST_USER_DEEP_TAGS_PATH, vectorizer, True
+)
+
+# Get features (X) and target (Y) for validation dataset (user and deep tags)
+X_val, Y_val = get_features_target_from_tags_file(
+    VAL_USER_DEEP_TAGS_PATH, vectorizer, True
 )
 
 # List that contains all the metrics for all the models
 metrics = []
 
 # %% [markdown]
-# ## Train Logistic Regression model
-
-# %%
-# Train Logistic Regression model
-model_logistic_regression = LogisticRegression(max_iter=1000)
-model_logistic_regression.fit(X_train, Y_train)
+# ## Train and Tune different machine learning models
 
 # %% [markdown]
-# ## Train Linear SVM model
+# ### Train Logistic Regression model
 
 # %%
-model_linear_svm = LinearSVC(random_state=0, tol=1e-5)
-model_linear_svm.fit(X_train, Y_train)
+# Train and Tune Logistic Regression model
+
+param_grid = {
+    "C": [0.01, 0.1, 1, 10],
+    "class_weight": [None, "balanced"],
+}
+
+gs = GridSearchCV(
+    estimator=LogisticRegression(max_iter=1000),
+    param_grid=param_grid,
+    scoring="recall",
+    n_jobs=-1,
+)
+gs.fit(X_train, Y_train)
+
+model_logistic_regression = gs.best_estimator_
 
 # %% [markdown]
-# ## Train Random Forest model
+# ### Train Linear SVM model
 
 # %%
-model_random_forest = RandomForestClassifier(random_state=0)
-model_random_forest.fit(X_train, Y_train)
+# Train and Tune Linear SVM model
+
+param_grid = {
+    "C": [0.01, 0.1, 1, 10],
+    "class_weight": [None, "balanced"],
+}
+
+gs = GridSearchCV(
+    estimator=LinearSVC(tol=1e-5),
+    param_grid=param_grid,
+    scoring="recall",
+    n_jobs=-1,
+)
+gs.fit(X_train, Y_train)
+
+model_linear_svm = gs.best_estimator_
 
 # %% [markdown]
-# ## Train k-NN model
+# ### Train Random Forest model
 
 # %%
-model_knn = KNeighborsClassifier()
-model_knn.fit(X_train, Y_train)
+# Train and Tune Random Forest model
+
+param_grid = {
+    "n_estimators": [100, 300],
+    "max_depth": [None, 10],
+    "min_samples_split": [2, 5],
+    "class_weight": [None, "balanced"],
+}
+
+gs = GridSearchCV(
+    estimator=RandomForestClassifier(),
+    param_grid=param_grid,
+    scoring="recall",
+    n_jobs=-1,
+)
+gs.fit(X_train, Y_train)
+
+model_random_forest = gs.best_estimator_
 
 # %% [markdown]
-# ## Train RBF SVM model
+# ### Train k-NN model
 
 # %%
-model_rbf_svm = SVC(kernel="rbf")
-model_rbf_svm.fit(X_train, Y_train)
+# Train and Tune k-NN model
+
+param_grid = {
+    "n_neighbors": [3, 5, 7, 11],
+    "weights": ["uniform", "distance"],
+}
+
+gs = GridSearchCV(
+    estimator=KNeighborsClassifier(),
+    param_grid=param_grid,
+    scoring="recall",
+    n_jobs=-1,
+)
+gs.fit(X_train, Y_train)
+
+model_knn = gs.best_estimator_
 
 # %% [markdown]
-# ## Results for Logistic Regression model
+# ### Train RBF SVM model
+
+# %%
+# Train and Tune RBF SVM model
+
+param_grid = {
+    "C": [0.1, 1, 10],
+    "gamma": ["scale", "auto"],
+    "class_weight": [None, "balanced"],
+}
+
+gs = GridSearchCV(
+    estimator=SVC(kernel="rbf"),
+    param_grid=param_grid,
+    scoring="recall",
+    n_jobs=-1,
+)
+gs.fit(X_train, Y_train)
+
+model_rbf_svm = gs.best_estimator_
+
+# %% [markdown]
+# ### Train XGBoost model
+
+# %%
+# Train and Tune XGBoost model
+
+param_grid = {
+    "n_estimators": [100, 300],
+    "max_depth": [3, 6],
+    "learning_rate": [0.01, 0.1],
+    "scale_pos_weight": [1, 3],
+}
+
+gs = GridSearchCV(
+    estimator=xgb.XGBClassifier(eval_metric="logloss"),
+    param_grid=param_grid,
+    scoring="recall",
+    n_jobs=-1,
+)
+gs.fit(X_train, Y_train)
+
+model_xgboost = gs.best_estimator_
+
+# %% [markdown]
+# ## Compare the models (using validation dataset)
+
+# %% [markdown]
+# ### Results for Logistic Regression model
 
 # %%
 # Prediction
-Y_pred = model_logistic_regression.predict(X_test)
+Y_pred = model_logistic_regression.predict(X_val)
 
-acc, f1_macro, prec_private, rec_private, conf_matrix = compute_metrics(Y_test, Y_pred)
+acc, f1_macro, prec_private, rec_private, conf_matrix = compute_metrics(Y_val, Y_pred)
 
 metrics.append(
     ["Logistic Regression", acc, f1_macro, prec_private, rec_private, conf_matrix]
@@ -271,59 +379,72 @@ metrics.append(
 print_metrics(acc, f1_macro, prec_private, rec_private, conf_matrix)
 
 # %% [markdown]
-# ## Results for Linear SVM model
+# ### Results for Linear SVM model
 
 # %%
 # Prediction
-Y_pred = model_linear_svm.predict(X_test)
+Y_pred = model_linear_svm.predict(X_val)
 
-acc, f1_macro, prec_private, rec_private, conf_matrix = compute_metrics(Y_test, Y_pred)
+acc, f1_macro, prec_private, rec_private, conf_matrix = compute_metrics(Y_val, Y_pred)
 
 metrics.append(["Linear SVM", acc, f1_macro, prec_private, rec_private, conf_matrix])
 
 print_metrics(acc, f1_macro, prec_private, rec_private, conf_matrix)
 
 # %% [markdown]
-# ## Results for Random Forest model
+# ### Results for Random Forest model
 
 # %%
 # Prediction
-Y_pred = model_random_forest.predict(X_test)
+Y_pred = model_random_forest.predict(X_val)
 
-acc, f1_macro, prec_private, rec_private, conf_matrix = compute_metrics(Y_test, Y_pred)
+acc, f1_macro, prec_private, rec_private, conf_matrix = compute_metrics(Y_val, Y_pred)
 
 metrics.append(["Random Forest", acc, f1_macro, prec_private, rec_private, conf_matrix])
 
 print_metrics(acc, f1_macro, prec_private, rec_private, conf_matrix)
 
 # %% [markdown]
-# ## Results for k-NN model
+# ### Results for k-NN model
 
 # %%
 # Prediction
-Y_pred = model_knn.predict(X_test)
+Y_pred = model_knn.predict(X_val)
 
-acc, f1_macro, prec_private, rec_private, conf_matrix = compute_metrics(Y_test, Y_pred)
+acc, f1_macro, prec_private, rec_private, conf_matrix = compute_metrics(Y_val, Y_pred)
 
 metrics.append(["k-NN", acc, f1_macro, prec_private, rec_private, conf_matrix])
 
 print_metrics(acc, f1_macro, prec_private, rec_private, conf_matrix)
 
 # %% [markdown]
-# ## Results for RBF SVM
+# ### Results for RBF SVM
 
 # %%
 # Prediction
-Y_pred = model_rbf_svm.predict(X_test)
+Y_pred = model_rbf_svm.predict(X_val)
 
-acc, f1_macro, prec_private, rec_private, conf_matrix = compute_metrics(Y_test, Y_pred)
+acc, f1_macro, prec_private, rec_private, conf_matrix = compute_metrics(Y_val, Y_pred)
 
 metrics.append(["RBF SVM", acc, f1_macro, prec_private, rec_private, conf_matrix])
 
 print_metrics(acc, f1_macro, prec_private, rec_private, conf_matrix)
 
 # %% [markdown]
-# ## Summary
+# ### Results for XGBoost
+
+# %%
+# Prediction
+Y_pred = model_xgboost.predict(X_val)
+
+acc, f1_macro, prec_private, rec_private, conf_matrix = compute_metrics(Y_val, Y_pred)
+
+metrics.append(["XGBoost", acc, f1_macro, prec_private, rec_private, conf_matrix])
+
+print_metrics(acc, f1_macro, prec_private, rec_private, conf_matrix)
+
+# %% [markdown]
+# ### Summary
 
 # %%
 metrics_df = pd.DataFrame(
@@ -351,3 +472,15 @@ for index, row in metrics_df.iterrows():
 plt.show()
 
 metrics_df
+
+# %% [markdown]
+# ## Pick and test the best model (using test dataset)
+
+# %%
+# Prediction
+best_model = model_random_forest
+Y_pred = best_model.predict(X_test)
+
+acc, f1_macro, prec_private, rec_private, conf_matrix = compute_metrics(Y_test, Y_pred)
+
+print_metrics(acc, f1_macro, prec_private, rec_private, conf_matrix)
