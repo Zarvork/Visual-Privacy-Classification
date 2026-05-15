@@ -245,7 +245,7 @@ param_grid = {
 }
 
 gs = GridSearchCV(
-    estimator=LogisticRegression(max_iter=1000),
+    estimator=LogisticRegression(max_iter=1000, random_state=8),
     param_grid=param_grid,
     scoring="recall",
     n_jobs=-1,
@@ -266,7 +266,7 @@ param_grid = {
 }
 
 gs = GridSearchCV(
-    estimator=LinearSVC(tol=1e-5),
+    estimator=LinearSVC(tol=1e-5, random_state=8),
     param_grid=param_grid,
     scoring="recall",
     n_jobs=-1,
@@ -289,7 +289,7 @@ param_grid = {
 }
 
 gs = GridSearchCV(
-    estimator=RandomForestClassifier(),
+    estimator=RandomForestClassifier(random_state=8),
     param_grid=param_grid,
     scoring="recall",
     n_jobs=-1,
@@ -332,7 +332,7 @@ param_grid = {
 }
 
 gs = GridSearchCV(
-    estimator=SVC(kernel="rbf"),
+    estimator=SVC(kernel="rbf", random_state=8),
     param_grid=param_grid,
     scoring="recall",
     n_jobs=-1,
@@ -355,7 +355,7 @@ param_grid = {
 }
 
 gs = GridSearchCV(
-    estimator=xgb.XGBClassifier(eval_metric="logloss"),
+    estimator=xgb.XGBClassifier(eval_metric="logloss", random_state=8),
     param_grid=param_grid,
     scoring="recall",
     n_jobs=-1,
@@ -496,22 +496,20 @@ print_metrics(acc, f1_macro, prec_private, rec_private, conf_matrix)
 #
 # En se basant sur la matrice de confusion du meilleur modèle (Random Forest sur test) :
 #
-# [[1176, 174], [101, 349]]
+# [[1187, 163], [98, 352]]
 #
-# Le modèle produit 174 faux positifs (images publiques classifiées privées) et 101 faux négatifs (images privées non détectées). Les faux négatifs sont les erreurs les plus critiques dans un privacy-warning system : ils correspondent à des images privées que le système n'aurait pas signalées à l'utilisateur.
+# Le modèle produit 163 faux positifs (images publiques classifiées privées) et 98 faux négatifs (images privées non détectées). Les faux négatifs sont les erreurs les plus critiques dans un privacy-warning system : ils correspondent à des images privées que le système n'aurait pas signalées à l'utilisateur.
 #
 # ### Critical discussion: 
 #
 # Le meilleur modèle dépend de la métrique considérée. Dans notre contexte, les métriques essentielles sont le Macro-F1 et le recall de la classe private.
-# Le Macro-F1 mesure la capacité du modèle à classer correctement chaque classe même lorsque le dataset est déséquilibré (ce qui est le cas ici : environ 3 fois plus d'images publiques que privées). Le recall de la classe private représente la capacité du modèle à détecter toutes les images privées. Cette métrique particulièrement critique car dans un privacy-warning system, un faux négatif signifie que le modèle n'a pas alerté l'utilisateur sur une image qui était en réalité privée.
+# Le Macro-F1 mesure la capacité du modèle à classer correctement chaque classe même lorsque le dataset est déséquilibré (ce qui est le cas ici : environ 3 fois plus d'images publiques que privées). Le recall de la classe private représente la capacité du modèle à détecter toutes les images privées. Cette métrique est particulièrement critique car dans un privacy-warning system, un faux négatif signifie que le modèle n'a pas alerté l'utilisateur sur une image qui était en réalité privée.
 #
-# En se basant sur le Macro-F1 et l'équilibre précision/recall, le meilleur modèle est Random Forest (0.78). En se basant uniquement sur le recall de la classe private, Logistic Regression et Linear SVM sont supérieurs (0.74). Nous retenons Random Forest comme meilleur modèle global.
-#
-# Nous remarquons qu'un "simple" modèle linéaire comme Logistic Regression/Linear SVM fonctionnent vraiment bien tandis que des modèles "plus complexes" comme XGBoost n'améliore pas les résultats.
+# En se basant sur le Macro-F1, RBF SVM (0.780) et Random Forest (0.778) sont essentiellement à égalité. En se basant uniquement sur le recall de la classe private, Logistic Regression et Linear SVM sont supérieurs (0.74). Nous retenons Random Forest comme meilleur modèle car il est beaucoup plus interprétable que RBF SVM.
 #
 # Un résultat notable est que les modèles linéaires simples (Logistic Regression, Linear SVM) obtiennent des performances très proches de Random Forest. En revanche, XGBoost, pourtant plus complexe, ne surpasse pas Random Forest ce qui suggère que sa complexité supplémentaire n'apporte pas de gain sur notre type de données (textuelles).
 #
-# Il existe un trade-off entre performance et simplicité. Random Forest offre le meilleur Macro-F1 mais est difficile à interpréter. Logistic Regression, avec un Macro-F1 légèrement inférieur (0.77 vs 0.78), est entièrement interprétable via ses coefficients et beaucoup plus rapide à entraîner.
+# Il existe un trade-off entre performance et simplicité. Random Forest offre un meilleur Macro-F1 mais est difficile à interpréter. Logistic Regression, avec un Macro-F1 légèrement inférieur (0.77 vs 0.78), est entièrement interprétable via ses coefficients et beaucoup plus rapide à entraîner.
 
 # %% [markdown]
 # # Topic 1 — User tags vs deep tags:
@@ -610,7 +608,7 @@ param_grid = {
 }
 
 gs = GridSearchCV(
-    estimator=LogisticRegression(max_iter=1000),
+    estimator=LogisticRegression(max_iter=1000, random_state=8),
     param_grid=param_grid,
     scoring="recall",
     n_jobs=-1,
@@ -623,6 +621,7 @@ model_logistic_regression_user_deep_tags = gs.best_estimator_
 # Get the best hyperparameters
 best_params = gs.best_params_
 print(f"Best params: {best_params}")
+best_params["random_state"] = 8
 
 # Get the features name
 feature_names = vectorizer_user_deep_tags.get_feature_names_out()
@@ -649,7 +648,7 @@ param_grid = {
 }
 
 gs = GridSearchCV(
-    estimator=LogisticRegression(max_iter=1000),
+    estimator=LogisticRegression(max_iter=1000, random_state=8),
     param_grid=param_grid,
     scoring="recall",
     n_jobs=-1,
@@ -662,6 +661,7 @@ model_logistic_regression_user_tags = gs.best_estimator_
 # Get the best hyperparameters
 best_params = gs.best_params_
 print(f"Best params: {best_params}")
+best_params["random_state"] = 8
 
 # Get the features name
 feature_names = vectorizer_user_tags.get_feature_names_out()
@@ -688,7 +688,7 @@ param_grid = {
 }
 
 gs = GridSearchCV(
-    estimator=LogisticRegression(max_iter=1000),
+    estimator=LogisticRegression(max_iter=1000, random_state=8),
     param_grid=param_grid,
     scoring="recall",
     n_jobs=-1,
@@ -701,6 +701,7 @@ model_logistic_regression_deep_tags = gs.best_estimator_
 # Get the best hyperparameters
 best_params = gs.best_params_
 print(f"Best params: {best_params}")
+best_params["random_state"] = 8
 
 # Get the features name
 feature_names = vectorizer_deep_tags.get_feature_names_out()
@@ -855,52 +856,3 @@ show(explanation)
 # Ce résultat s'explique par le contenu du dataset : les images "private" dans PrivacyAlert correspondent quasi-exclusivement à du contenu sexuel et du contenu LGBTQ+, tandis que les images "public" sont des scènes génériques extérieures. Ce n'est pas un échec de généralisation du modèle. Le problème principal est que le dataset représente une définition très étroite et biaisée de la privacy.
 #
 # Une conséquence de cela est que le tag gay figure parmi les features les plus discriminantes pour la classe "private" dans le modèle user_deep_tags. Un tel modèle risque d'associer systématiquement le contenu LGBTQ+ à du contenu privé, ce qui est très problématique.
-
-# %% [markdown]
-# ## Helper to see most present tags in dataset
-
-# %%
-from collections import Counter
-import pandas as pd
-
-train_data = pd.read_csv(
-    "data/curated_privacyalert/annotations/tags/user_tags/dt_plus_ut_overall1_2.tsv",
-    sep="\t",
-    header=None,
-    names=["idx", "label", "image_id", "tags"],
-)
-
-# Tags of private images
-private_tags = train_data[train_data["label"] == 1]["tags"].fillna("").str.split()
-private_tag_counts = Counter(t for tags in private_tags for t in tags)
-print("Top tags in PRIVATE images:")
-print(private_tag_counts.most_common(20))
-
-# Tags of public images
-public_tags = train_data[train_data["label"] == 0]["tags"].fillna("").str.split()
-public_tag_counts = Counter(t for tags in public_tags for t in tags)
-print("\nTop tags in PUBLIC images:")
-print(public_tag_counts.most_common(20))
-
-# %%
-from collections import Counter
-import pandas as pd
-
-train_data = pd.read_csv(
-    "data/curated_privacyalert/annotations/tags/deep_tags/dt_plus_ut_overall1_2.tsv",
-    sep="\t",
-    header=None,
-    names=["idx", "label", "image_id", "tags"],
-)
-
-# Tags of private images
-private_tags = train_data[train_data["label"] == 1]["tags"].fillna("").str.split()
-private_tag_counts = Counter(t for tags in private_tags for t in tags)
-print("Top tags in PRIVATE images:")
-print(private_tag_counts.most_common(20))
-
-# Tags of public images
-public_tags = train_data[train_data["label"] == 0]["tags"].fillna("").str.split()
-public_tag_counts = Counter(t for tags in public_tags for t in tags)
-print("\nTop tags in PUBLIC images:")
-print(public_tag_counts.most_common(20))
