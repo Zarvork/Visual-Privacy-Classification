@@ -477,6 +477,26 @@ plt.show()
 
 metrics_df
 
+# %%
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
+
+# Macro-F1
+ax1.bar(metrics_df["Model"], metrics_df["Macro-F1"], color="steelblue")
+ax1.set_ylim(0.68, 0.80)
+ax1.set_ylabel("Macro-F1")
+ax1.set_title("Macro-F1 by model")
+ax1.tick_params(axis="x", rotation=20)
+
+# Recall
+ax2.bar(metrics_df["Model"], metrics_df["Recall (Private Class)"], color="orange")
+ax2.set_ylim(0.55, 0.80)
+ax2.set_ylabel("Recall (Private class)")
+ax2.set_title("Recall by model")
+ax2.tick_params(axis="x", rotation=20)
+
+plt.tight_layout()
+plt.show()
+
 # %% [markdown]
 # ## Pick and test the best model (using test dataset)
 
