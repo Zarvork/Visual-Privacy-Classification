@@ -522,14 +522,14 @@ print_metrics(acc, f1_macro, prec_private, rec_private, conf_matrix)
 #
 # ### Critical discussion: 
 #
-# Le meilleur modèle dépend de la métrique considérée. Dans notre contexte, les métriques essentielles sont le Macro-F1 et le recall de la classe private.
-# Le Macro-F1 mesure la capacité du modèle à classer correctement chaque classe même lorsque le dataset est déséquilibré (ce qui est le cas ici : environ 3 fois plus d'images publiques que privées). Le recall de la classe private représente la capacité du modèle à détecter toutes les images privées. Cette métrique est particulièrement critique car dans un privacy-warning system, un faux négatif signifie que le modèle n'a pas alerté l'utilisateur sur une image qui était en réalité privée.
+# Le meilleur modèle dépend de la métrique considérée. Dans notre contexte, les métriques essentielles sont le Macro-F1 et le Recall de la classe private.
+# Le Macro-F1 mesure la capacité du modèle à classer correctement chaque classe même lorsque le dataset est déséquilibré (ce qui est le cas ici : environ 3 fois plus d'images publiques que privées). Le Recall de la classe private représente la capacité du modèle à détecter toutes les images privées. Cette métrique est particulièrement critique, car dans un privacy-warning system, un faux négatif signifie que le modèle n'a pas alerté l'utilisateur sur une image qui était en réalité privée.
 #
-# En se basant sur le Macro-F1, RBF SVM (0.780) et Random Forest (0.778) sont essentiellement à égalité. En se basant uniquement sur le recall de la classe private, Logistic Regression et Linear SVM sont supérieurs (0.74). Nous retenons Random Forest comme meilleur modèle car il est beaucoup plus interprétable que RBF SVM.
+# En se basant sur le Macro-F1, RBF SVM (0.780) et Random Forest (0.778) sont essentiellement à égalité. En se basant uniquement sur le Recall de la classe private, Logistic Regression et Linear SVM sont supérieurs (0.74). Nous retenons Random Forest comme meilleur modèle, car il est beaucoup plus interprétable que RBF SVM.
 #
 # Un résultat notable est que les modèles linéaires simples (Logistic Regression, Linear SVM) obtiennent des performances très proches de Random Forest. En revanche, XGBoost, pourtant plus complexe, ne surpasse pas Random Forest ce qui suggère que sa complexité supplémentaire n'apporte pas de gain sur notre type de données (textuelles).
 #
-# Il existe un trade-off entre performance et simplicité. Random Forest offre un meilleur Macro-F1 mais est difficile à interpréter. Logistic Regression, avec un Macro-F1 légèrement inférieur (0.77 vs 0.78), est entièrement interprétable via ses coefficients et beaucoup plus rapide à entraîner.
+# Il existe un trade-off entre performance et simplicité. Random Forest offre un meilleur Macro-F1, mais est difficile à interpréter. Logistic Regression, avec un Macro-F1 légèrement inférieur (0.77 vs 0.78), est entièrement interprétable via ses coefficients et beaucoup plus rapide à entraîner.
 
 # %% [markdown]
 # # Topic 1 — User tags vs deep tags:
@@ -863,16 +863,151 @@ show(explanation)
 #
 # Les deep_tags produisent le plus de faux positifs (280) mais relativement peu de faux négatifs (129). Ainsi, le modèle préfère sur-alerter plutôt que manquer des images privées. Cela explique son recall élevé (0.72) mais sa précision faible (0.55). À l'inverse, user_tags est moins prudent. Avec ce modèle, on a moins de fausses alertes (188) mais plus d'images privées manquées (149). La combinaison user_deep_tags offre le meilleur compromis global.
 #
-# Les faux négatifs dans les trois cas correspondent probablement aux mêmes images : des photos privées sans contenu sexuel (intérieurs de maison, documents...) que le modèle ne reconnaît pas comme privées car ces patterns sont sous-représentés voire absent dans les features dominantes.
+# Les faux négatifs dans les trois cas correspondent probablement aux mêmes images : des photos privées sans contenu sexuel (intérieurs de maison, documents...) que le modèle ne reconnaît pas comme privé, car ces patterns sont sous-représentés voire absent dans les features dominantes.
 #
 # ### Critical discussion:
 #
-# Nous avons utilisé Logistic Regression plutôt que Random Forest car ce modèle donne de bons résultats tout en étant entièrement interprétable via ses coefficients.
+# Nous avons utilisé Logistic Regression plutôt que Random Forest, car ce modèle donne de bons résultats tout en étant entièrement interprétable via ses coefficients.
 #
-# En se basant sur le Macro-F1, la hiérarchie est user_deep_tags et user_tags un peu près au meme niveau, suivi de deep_tags. La différence entre user_deep_tags et user_tags est négligeable. Cependant, combiner les deux sources a un intéret visible sur le recall (0.74 pour user_deep_tags vs 0.68 pour user_tags). Ainsi, les deep_tags augmentent la sensibilité du modèle, mais génèrent aussi plus de faux positifs.
+# En se basant sur le Macro-F1, la hiérarchie est user_deep_tags et user_tags un peu près au même niveau, suivi de deep_tags. La différence entre user_deep_tags et user_tags est négligeable. Cependant, combiner les deux sources à un intérêt visible sur le Recall (0.74 pour user_deep_tags vs 0.68 pour user_tags). Ainsi, les deep_tags augmentent la sensibilité du modèle, mais génèrent aussi plus de faux positifs.
 #
-# Les graphiques précédents révèlent que le modèle apprend deux types de features. Du côté "private", on a naked, nude, sexy, maillot, trunks qui sont tous liés a du contenu sexuel. Du côté "public", on a graffiti, sign, church, fence qui sont des espaces urbains extérieurs. Le modèle n'apprend donc pas la privacy au sens large mais distingue "contenu sexuel" de "scène publique générique".
+# Les graphiques précédents révèlent que le modèle apprend deux types de features. Du côté "private", on a naked, nude, sexy, maillot, trunks qui sont tous liés à du contenu sexuel. Du côté "public", on a graffiti, sign, church, fence qui sont des espaces urbains extérieurs. Le modèle n'apprend donc pas la privacy au sens large, mais distingue "contenu sexuel" de "scène publique générique".
 #
-# Ce résultat s'explique par le contenu du dataset : les images "private" dans PrivacyAlert correspondent quasi-exclusivement à du contenu sexuel et du contenu LGBTQ+, tandis que les images "public" sont des scènes génériques extérieures. Ce n'est pas un échec de généralisation du modèle. Le problème principal est que le dataset représente une définition très étroite et biaisée de la privacy.
+# Ce résultat s'explique par le contenu du dataset : les images "private" dans PrivacyAlert correspondent quasi-exclusivement à du contenu sexuel et à du contenu LGBTQ+, tandis que les images "public" sont des scènes génériques extérieures. Ce n'est pas un échec de généralisation du modèle. Le problème principal est que le dataset représente une définition très étroite et biaisée de la privacy.
 #
 # Une conséquence de cela est que le tag gay figure parmi les features les plus discriminantes pour la classe "private" dans le modèle user_deep_tags. Un tel modèle risque d'associer systématiquement le contenu LGBTQ+ à du contenu privé, ce qui est très problématique.
+
+# %% [markdown]
+# # Topic 6 — Decision threshold and social cost
+#
+# Question:
+# In a privacy-warning system, should we prefer more warnings or fewer missed private images?
+#
+# Many classifiers produce probabilities or scores.
+# The default threshold is often:
+#
+# - 0.5
+#
+# But you can compare:
+#
+# - 0.2
+# - 0.3
+# - 0.5
+# - 0.7
+# - 0.8
+
+# %% [markdown]
+# ## Train and tune best resulting machine learning algorithm (from Topic 3)
+
+# %%
+# Train and Tune Random Forest model
+
+param_grid = {
+    "n_estimators": [100, 300],
+    "max_depth": [None, 10],
+    "min_samples_split": [2, 5],
+    "class_weight": [None, "balanced"],
+}
+
+gs = GridSearchCV(
+    estimator=RandomForestClassifier(random_state=8),
+    param_grid=param_grid,
+    scoring="recall",
+    n_jobs=-1,
+)
+gs.fit(X_train, Y_train)
+
+model_random_forest = gs.best_estimator_
+
+# %% [markdown]
+# ## Results on Validation dataset
+
+# %%
+
+y_proba = model_random_forest.predict_proba(X_val)[:, 1]
+
+thresholds = [0.2, 0.3, 0.5, 0.7, 0.8]
+metrics = []
+
+
+for t in thresholds:
+    y_pred = (y_proba >= t).astype(int)
+
+    acc, f1_macro, prec_private, rec_private, conf_matrix = compute_metrics(Y_val, y_pred)
+
+    metrics.append([t, acc, f1_macro, prec_private, rec_private, conf_matrix])
+
+    #print_metrics(acc, f1_macro, prec_private, rec_private, conf_matrix)
+
+# %% [markdown]
+# ## Compare the models (using validation dataset)
+
+# %%
+metrics_df = pd.DataFrame(
+    metrics,
+    columns=[
+        "Threshold",
+        "Accuracy",
+        "Macro-F1",
+        "Precision (Private class)",
+        "Recall (Private Class)",
+        "Confusion matrix",
+    ],
+)
+fig, axs = plt.subplots(metrics_df.shape[0], figsize=(25, 25))
+
+
+for index, row in metrics_df.iterrows():
+    disp = ConfusionMatrixDisplay(
+        confusion_matrix=row["Confusion matrix"], display_labels=["Public", "Private"]
+    )
+    disp.plot(ax=axs[index], cmap=plt.cm.Blues)
+    axs[index].set_title("Confusion Matrix for " + str(row["Threshold"]))
+
+
+plt.show()
+
+metrics_df
+
+# %% [markdown]
+# ## Analyse
+#
+#
+# ### Differences for Precision and Recall
+#
+# Ce que nous pouvons remarquer :
+#
+# La Précision augmente avec le threshold : elle passe de 44 % à 0.2 jusqu'à 86 % à 0.8. En montant le seuil, le modèle ne déclenche une alerte que lorsqu'il est très confiant => il produit moins de fausses alertes
+# Le Recall diminue inversement : il chute de 88 % à 0.2 à 36 % à 0.8. Un threshold élevé laisse passer beaucoup d'images privées sans alertes
+#
+# Il existe donc un échange entre nombres de faux positifs (threshold bas) et nombre de faux négatifs (threshold haut).
+#
+# Considérant le type de données que l'application traite, il semble très largement préférable de favoriser le Recall par rapport à la Précision. De manière générale, on préfère largement recevoir une alerte pour rien plutôt que de laisser une image privée être publiée.
+# Néanmoins, il est important de noter que recevoir trop d'alertes a la publication peut entraîner un épuisement de la part de l'utilisateur qui soit retire l'application soit appuie sur "quand même publier" sans regarder la raison de l'alerte.
+#
+# ### Best threshold choice
+#
+# En prenant tout cela en compte, nous avons choisi un threshold de **0.3**, malgré la probabilité de recevoir une fausse alerte de 25 %, la probabilité de laisser passer une image privée en public est a seulement 16 %, c'est-à-dire 2 fois moins qu'avec une threshold de 0,5.
+
+# %% [markdown]
+# ## Test sur le Test dataset
+
+# %%
+y_proba = model_random_forest.predict_proba(X_test)[:, 1]
+
+y_pred = (y_proba >= 0.3).astype(int)
+
+acc, f1_macro, prec_private, rec_private, conf_matrix = compute_metrics(Y_test, y_pred)
+
+print_metrics(acc, f1_macro, prec_private, rec_private, conf_matrix)
+
+# %% [markdown]
+# ## Conclusion
+#
+# Évalué sur le dataset de test, le modèle avec un threshold de 0.3 atteint un Recall de 88% : 8 images privées sur 10 déclenchent correctement une alerte avant publication. Les 54 faux négatifs restants représentent 12% des images privées.
+# En contrepartie, la Précision de 51% implique 381 fausses alertes, soit environ 1 publication sur 4 faussement signalée. Ce niveau est acceptable dans ce contexte, car chaque fausse alerte reste gérable par l'utilisateur, contrairement à une image privée publiée silencieusement.
+# Le Macro-F1 de 73% et l'accuracy de 76% confirment des performances globalement solides, malgré le déséquilibre volontaire entre Recall et Precision.
+# Ce threshold constitue ainsi le point d'équilibre optimal pour une application de protection de la vie privée : il minimise le risque irréversible (laisser passer une image privée) tout en maintenant un taux de fausses alertes raisonnable pour ne pas éroder la confiance et l'usage de l'application.
+
+# %% [markdown]
+#
