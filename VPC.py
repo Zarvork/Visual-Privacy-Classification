@@ -44,6 +44,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import SVC
 from sklearn.model_selection import GridSearchCV
+from sklearn.model_selection import train_test_split
 import xgboost as xgb
 import numpy as np
 from interpret.glassbox import LogisticRegression as InterpretLogisticRegression
@@ -139,6 +140,20 @@ VAL_USER_TAGS_PATH = (
     "data/curated_privacyalert/annotations/tags/user_tags/dt_plus_ut_val1_2.tsv"
 )
 
+# Folder that contains the batch of all of our data
+OBJECTS_PATH = (
+    "data/PrivacyAlert/dets"
+)
+
+# Folder that contains the batch of all of our data
+SCENES_PATH = (
+    "data/PrivacyAlert/scenes"
+)
+
+CATEGORIES_PATH = (
+    "data/PrivacyAlert/dets/categories.yaml"
+)
+
 
 # %% [markdown]
 # # Helper functions
@@ -207,8 +222,8 @@ def print_metrics(acc, f1_macro, prec_private, rec_private, conf_matrix):
 # - XGBoost
 # - k-NN
 
-# %% [markdown]
-# ## Load training, tests and validation datasets (user and deep tags)
+# %%
+## Load training, tests and validation datasets (user and deep tags)
 
 # %%
 vectorizer = TfidfVectorizer(max_features=5000)
@@ -229,6 +244,11 @@ X_val, Y_val = get_features_target_from_tags_file(
 
 # List that contains all the metrics for all the models
 metrics = []
+
+# %% [markdown]
+# ## Load training, tests and validation datasets (k)
+
+# %%
 
 # %% [markdown]
 # ## Train and Tune different machine learning models
@@ -1001,6 +1021,7 @@ acc, f1_macro, prec_private, rec_private, conf_matrix = compute_metrics(Y_test, 
 
 print_metrics(acc, f1_macro, prec_private, rec_private, conf_matrix)
 
+
 # %% [markdown]
 # ## Conclusion
 #
@@ -1010,4 +1031,221 @@ print_metrics(acc, f1_macro, prec_private, rec_private, conf_matrix)
 # Ce threshold constitue ainsi le point d'équilibre optimal pour une application de protection de la vie privée : il minimise le risque irréversible (laisser passer une image privée) tout en maintenant un taux de fausses alertes raisonnable pour ne pas éroder la confiance et l'usage de l'application.
 
 # %% [markdown]
+# # Topic 2 -- Tags vs scenes vs objects
+
+# %% [markdown]
+# In this topic, we want to answer the following question: which feature family is most useful for predicting visual privacy ?
 #
+# We will hence test all possible combinaison of the data that is given to use. That is to say, we will compare the following combinaisons:
+#
+# - tags
+# - scene features
+# - object features
+# - tags + scenes
+# - tags + objects
+# - tags + scenes + objects
+
+# %% [markdown]
+# We first want to construct a map like this:
+# image_id -> [deep_user_tag, scenes, objects]
+#
+# We will consider only scene tag with confidence level > $\alpha$ and objects with confidence level > $\beta$ with $\alpha = 0.99$ and $\beta = 0.8$ to have a compromise between the number of tags / objects and their precision.
+
+# %%
+def load_data(alpha: float, beta: float, tags_path: str) -> pd.DataFrame:
+    data_df = pd.read_csv(
+        tags_path,
+        sep="\t",
+        header=None,
+        names=["idx", "label", "image_id", "tags"],
+    )
+
+    labels_df = pd.read_csv(
+        LABELS_PATH,
+        sep=",",
+        header=None,
+        skiprows=1,
+        names = ["idx", "image_id", "batch", "label"],
+    )
+
+    scene_tags = []
+    object_categories = []
+
+    for image_id, batch in zip(labels_df["image_id"], labels_df["batch"]):
+        if not (data_df["image_id"] == image_id).any():
+            continue
+
+        scene_tags_df = pd.read_csv(
+            SCENES_PATH + f"/batch{batch}/{image_id}.csv",
+            sep=";" ,
+            header=None,
+            skiprows=1,
+            names=["scene", "confidence"],
+        )
+        # scene_tags_df = scene_tags_df.sort_values(by=["confidence"])
+        scene_tags_df["confidence"] = pd.to_numeric(scene_tags_df["confidence"])
+
+        objects_tags_df = pd.read_json(
+            OBJECTS_PATH + f"/batch{batch}/{image_id}.json",
+        )
+        objects_tags_df["confidence"] = pd.to_numeric(objects_tags_df["confidence"])
+
+        scene_tags.append(" ".join(scene_tags_df[scene_tags_df["confidence"] > alpha]["scene"].tolist()))
+        object_categories.append(objects_tags_df[objects_tags_df["confidence"] > beta]["categories"].tolist())
+    
+    data_df["scene_tags"] = scene_tags
+    data_df["object_categories"] = object_categories
+    return data_df
+
+
+# %%
+alpha, beta = 0.99, 0.8
+data_test = load_data(alpha, beta, TEST_USER_DEEP_TAGS_PATH)
+data_train = load_data(alpha, beta, TRAIN_USER_DEEP_TAGS_PATH)
+data_validation = load_data(alpha, beta, VAL_USER_DEEP_TAGS_PATH)
+
+# %%
+X_test, y_test = data_test.drop("label", axis=1), data_test["label"]
+X_train, y_train = data_train.drop("label", axis=1), data_train["label"]
+X_val, y_val= data_validation.drop("label", axis=1), data_validation["label"]
+print(X_test.shape, X_train.shape, X_val.shape)
+
+# %% [markdown]
+# Comme nous avons regroupé toutes nos données dans la dataframe data, nous devons faire une séparation de test et train dataset.
+# Le dataset nous en donne déjà une, mais il nous est plus rapide et plus simple d'en refaire une nous-même.
+
+# %% [markdown]
+# On utilise ici le CustomTransformer pour avoir la donnée organisée dans un vecteur de 80 dans une échelle logarithmique.
+#
+# Si le modèle détecte les objects de catégories [0, 0, 0, 14], on veut un vecteur avec [3, 0, ..., 1 (index 14), 0, ..., 0].
+#
+# Nous appliquons ensuite une échelle logarithmique pour gérer le cas d'une sur-représentation d'une catégorie dans un vecteur.
+#
+# Par exemple, nous savons que la catégorie 0 correspond à l'objet "person". Dans le cas d'une image avec une foule, on ne veut pas d'un vecteur avec un indice 0 d'une valeur de 20, puisque cela risque de minimiser l'impact des autres objets de l'image.
+
+# %%
+from sklearn.compose import ColumnTransformer
+from sklearn.preprocessing import MultiLabelBinarizer
+from sklearn.pipeline import Pipeline
+from sklearn.base import BaseEstimator, TransformerMixin
+
+class CustomTransformer(BaseEstimator, TransformerMixin):
+    def __init__(self, *, param=1):
+        self.param = param
+
+    def fit(self, X, y=None):
+        return self
+
+    def transform(self, X):
+        matrix = np.vstack([
+            np.bincount(categories, minlength=80)
+            for categories in X
+        ])
+
+        return np.log1p(matrix)
+
+    def get_feature_names_out(self, input=None):
+        return np.array([f'category_{i}' for i in range(80)])
+
+feature_map = dict()
+feature_map['tags'] = ('tags', TfidfVectorizer(max_features=5000))
+feature_map['scenes'] = ('scene_tags', TfidfVectorizer(max_features=300))
+feature_map['objects'] = ('object_categories', CustomTransformer())
+
+# %%
+from itertools import combinations
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import roc_auc_score
+
+metrics = []
+
+def explore_combinaison(current, i):
+    if (i == len(feature_map)):
+        if current == []:
+            return
+
+        names = [list(feature_map.keys())[i] for i in current]
+        pipe = Pipeline([
+            ('features', ColumnTransformer(transformers=[
+                (name, feature_map[name][1], feature_map[name][0])
+                for name in names
+            ])),
+            ('model', LogisticRegression(max_iter=1000))
+        ])
+
+        param_grid = {
+            "model__C": [0.01, 0.1, 1, 10],
+            "model__class_weight": [None, "balanced"],
+        }
+
+        gs = GridSearchCV(
+            estimator=pipe,
+            param_grid=param_grid,
+            scoring=["f1_macro", "recall"],
+            refit="f1_macro",
+            n_jobs=-1,
+        )
+
+        gs.fit(X_train, y_train)
+        # pipe.fit(X_train, y_train)
+        best_pipe = gs.best_estimator_
+
+        y_pred = best_pipe.predict(X_test)
+        acc, f1_macro, prec_private, rec_private, conf_matrix = compute_metrics(y_test, y_pred)
+        # print_metrics(acc, f1_macro, prec_private, rec_private, conf_matrix)
+
+        metrics.append(
+            [" ".join(names), acc, f1_macro, prec_private, rec_private, conf_matrix]
+        )
+        
+    else:
+        explore_combinaison(current, i + 1)
+        explore_combinaison(current + [i], i + 1)
+
+
+# %%
+current = []
+
+explore_combinaison(current, 0)
+
+# %%
+metrics_df = pd.DataFrame(
+    metrics,
+    columns=[
+        "Threshold",
+        "Accuracy",
+        "Macro-F1",
+        "Precision (Private class)",
+        "Recall (Private Class)",
+        "Confusion matrix",
+    ],
+)
+fig, axs = plt.subplots(metrics_df.shape[0], figsize=(40, 40))
+
+for index, row in metrics_df.iterrows():
+    disp = ConfusionMatrixDisplay(
+        confusion_matrix=row["Confusion matrix"], display_labels=["Public", "Private"]
+    )
+    disp.plot(ax=axs[index], cmap=plt.cm.Blues)
+    axs[index].set_title("Confusion Matrix for " + str(row["Threshold"]))
+
+
+plt.show()
+
+metrics_df = metrics_df.sort_values(by=["Macro-F1", "Recall (Private Class)"], ascending=False)
+metrics_df
+
+# %% [markdown]
+# ## Conclusion
+#
+# Comme on pouvait s'y attendre, les objets seuls de l'image ne permettent pas de déterminer avec précision si l'image est publique ou privée (seulement 0.64 en macro-f1).
+#
+# On peut également observer un vrai changement lorsque l'on prend en compte les tags (ici, les deeps et les users). En effet, les combinaisons scenes objects, scenes only et objects ne dépassent pas un macro score de 0.70. Alors que les tags only atteignent un score macro-f1 de 0.78.
+#
+# Enfin, et sans trop de surprise, la prise en compte de toutes les features (tags, scenes et objects) permet d'obtenir le plus haut score de macro-f1 (0.814). On observe cependant une baisse de recall par rapport au tag only (0.68 au lieu de 0.78).
+#
+# La combinaison tags only offre le meilleur compromis entre macro-f1 et recall. Cependant, la combinaison de toutes les features offre le meilleur macro-f1.
+#
+# Il est intéressant de rajouter que le false negative rate: ($\frac{FN}{(FN + TP)}$) est significativement plus élevé pour les tags only (0.285) que pour toutes les features (0.071). Ainsi, si l'application détecte un cas faux cas privé 28% du temps, l'utilisateur pourrait s'habituer à ne pas se fier au warning, et donc à être désensibiliser à cette prévention.
+#
+# Dans ce cas précis, il peut être intéressant de choisir finalement la combinaison de toutes les features.
