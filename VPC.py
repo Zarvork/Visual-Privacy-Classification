@@ -207,7 +207,7 @@ def print_metrics(acc, f1_macro, prec_private, rec_private, conf_matrix):
 
 
 # %% [markdown]
-# # Topic 3 — Comparison of classical models
+# # Topic 3 — Comparison of classical models (anis.feore)
 #
 # Question:
 #
@@ -247,8 +247,6 @@ metrics = []
 
 # %% [markdown]
 # ## Load training, tests and validation datasets (k)
-
-# %%
 
 # %% [markdown]
 # ## Train and Tune different machine learning models
@@ -552,7 +550,7 @@ print_metrics(acc, f1_macro, prec_private, rec_private, conf_matrix)
 # Il existe un trade-off entre performance et simplicité. Random Forest offre un meilleur Macro-F1, mais est difficile à interpréter. Logistic Regression, avec un Macro-F1 légèrement inférieur (0.77 vs 0.78), est entièrement interprétable via ses coefficients et beaucoup plus rapide à entraîner.
 
 # %% [markdown]
-# # Topic 1 — User tags vs deep tags:
+# # Topic 1 — User tags vs deep tags: (anis.feore)
 #
 # Question:
 # Are human/social tags or automatically generated visual tags more useful for predicting privacy?
@@ -898,7 +896,7 @@ show(explanation)
 # Une conséquence de cela est que le tag gay figure parmi les features les plus discriminantes pour la classe "private" dans le modèle user_deep_tags. Un tel modèle risque d'associer systématiquement le contenu LGBTQ+ à du contenu privé, ce qui est très problématique.
 
 # %% [markdown]
-# # Topic 6 — Decision threshold and social cost
+# # Topic 6 — Decision threshold and social cost (roman.miralves)
 #
 # Question:
 # In a privacy-warning system, should we prefer more warnings or fewer missed private images?
@@ -1031,7 +1029,7 @@ print_metrics(acc, f1_macro, prec_private, rec_private, conf_matrix)
 # Ce threshold constitue ainsi le point d'équilibre optimal pour une application de protection de la vie privée : il minimise le risque irréversible (laisser passer une image privée) tout en maintenant un taux de fausses alertes raisonnable pour ne pas éroder la confiance et l'usage de l'application.
 
 # %% [markdown]
-# # Topic 2 -- Tags vs scenes vs objects
+# # Topic 2 -- Tags vs scenes vs objects (johan.emmanuelli)
 
 # %% [markdown]
 # In this topic, we want to answer the following question: which feature family is most useful for predicting visual privacy ?
