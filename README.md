@@ -37,3 +37,8 @@ uv run jupyter lab VPC.ipynb
 
 `VPC.py` is the same notebook in [jupytext](https://jupytext.readthedocs.io) percent format.
 
+## Authors
+
+- Anis Feore
+- Roman Miralves
+- Johan Emmanuelli
